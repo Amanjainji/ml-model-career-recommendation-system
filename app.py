@@ -1,15 +1,21 @@
 import os
-import pickle
 import traceback
 import numpy as np
 from flask import Flask, request, jsonify
+import joblib
 
 app = Flask(__name__)
 
-# Paths (Render will read from repo or environment)
-MODEL_LOCAL_PATH = os.environ.get("MODEL_LOCAL_PATH", "model/trained_career_model.pkl")
+# Path to model (default = model/career_model.joblib)
+MODEL_LOCAL_PATH = os.environ.get("MODEL_LOCAL_PATH", "model/career_model.joblib")
 
-# Features and career labels (fixed from your training info)
+# Load model
+if not os.path.exists(MODEL_LOCAL_PATH):
+    raise RuntimeError(f"Model file not found at {MODEL_LOCAL_PATH}")
+
+model = joblib.load(MODEL_LOCAL_PATH)
+
+# Features and career labels (from training info)
 FEATURE_NAMES = [
     "Math_Score","Science_Score","English_Score","Social_Score",
     "Logical_Reasoning","Verbal_Ability","Numerical_Ability",
@@ -31,13 +37,6 @@ CAREER_CLASSES = [
     "Teaching"
 ]
 
-# Load model at startup
-if not os.path.exists(MODEL_LOCAL_PATH):
-    raise RuntimeError(f"Model file not found at {MODEL_LOCAL_PATH}")
-
-with open(MODEL_LOCAL_PATH, "rb") as f:
-    model = pickle.load(f)
-
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -49,27 +48,27 @@ def predict():
     try:
         data = request.get_json(force=True)
 
-        # Validate all features are present
+        # Validate all features
         missing = [f for f in FEATURE_NAMES if f not in data]
         if missing:
             return jsonify({"error": f"Missing fields: {missing}"}), 400
 
-        # Extract features in correct order
+        # Convert to array
         features = [data[f] for f in FEATURE_NAMES]
         features = np.array(features, dtype=float).reshape(1, -1)
 
         # Predict
-        pred_index = model.predict(features)[0]
-        # If GradientBoostingClassifier trained on encoded labels, pred_index is already int index
-        if isinstance(pred_index, (np.integer, int)):
-            career = CAREER_CLASSES[pred_index]
+        pred = model.predict(features)[0]
+
+        # If classifier outputs index
+        if isinstance(pred, (np.integer, int)):
+            career = CAREER_CLASSES[pred]
         else:
-            # In case model.predict outputs label string directly
-            career = str(pred_index)
+            career = str(pred)
 
         result = {"recommended_career": career}
 
-        # Optionally add confidence score
+        # Confidence score (optional)
         if hasattr(model, "predict_proba"):
             prob = model.predict_proba(features).max().item()
             result["confidence"] = round(float(prob), 4)
