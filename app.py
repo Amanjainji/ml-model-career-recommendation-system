@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 import joblib
 
 app = Flask(__name__)
+CORS(app) 
 
 # Path to model (default = model/career_model.joblib)
 MODEL_LOCAL_PATH = os.environ.get("MODEL_LOCAL_PATH", "model/career_model.joblib")
