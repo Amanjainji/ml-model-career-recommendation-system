@@ -1,4 +1,5 @@
 flask
+flask-cors
 gunicorn
 scikit-learn==1.6.1
 numpy==2.0.2
